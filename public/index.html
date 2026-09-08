@@ -1,1 +1,225 @@
+<!DOCTYPE html>
+<html lang="ru">
 
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>1v1ChatRoulette</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- ОКНО 18+ -->
+
+    <div id="ageModal" class="modal">
+
+        <div class="modal-content">
+
+            <div class="logo">
+                1v1<span>ChatRoulette</span>
+            </div>
+
+            <h1>Добро пожаловать</h1>
+
+            <p class="subtitle">
+                Случайные видеочаты один на один
+            </p>
+
+            <div class="warning">
+                <strong>⚠️ Только для пользователей 18+</strong>
+
+                <p>
+                    Сервис предназначен только для совершеннолетних.
+                    Перед использованием необходимо подтвердить свой возраст
+                    и принять условия использования.
+                </p>
+            </div>
+
+            <div class="rules">
+
+                <h3>Правила</h3>
+
+                <p>• Уважайте других пользователей.</p>
+                <p>• Не публикуйте запрещённый контент.</p>
+                <p>• Не сообщайте незнакомцам личные данные.</p>
+                <p>• При нарушении правил используйте кнопку жалобы.</p>
+
+            </div>
+
+            <label class="checkbox">
+
+                <input type="checkbox" id="termsCheck">
+
+                <span>
+                    Я подтверждаю, что мне <strong>18 лет или больше</strong>,
+                    принимаю условия использования и правила сервиса.
+                </span>
+
+            </label>
+
+            <button id="enterButton" disabled>
+                Войти в 1v1ChatRoulette
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- ОСНОВНОЙ САЙТ -->
+
+    <div id="app" class="hidden">
+
+        <header>
+
+            <div class="logo">
+                1v1<span>ChatRoulette</span>
+            </div>
+
+            <div id="status">
+                Готов к поиску
+            </div>
+
+        </header>
+
+
+        <!-- НАСТРОЙКИ -->
+
+        <section id="settings">
+
+            <div class="setting">
+
+                <label for="myGender">
+                    Ваш пол
+                </label>
+
+                <select id="myGender">
+
+                    <option value="male">
+                        👨 Мужчина
+                    </option>
+
+                    <option value="female">
+                        👩 Женщина
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <div class="setting">
+
+                <label for="searchGender">
+                    Искать
+                </label>
+
+                <select id="searchGender">
+
+                    <option value="any">
+                        🌎 Любого
+                    </option>
+
+                    <option value="male">
+                        👨 Мужчину
+                    </option>
+
+                    <option value="female">
+                        👩 Женщину
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <button id="startButton" class="primary">
+                🔍 Найти собеседника
+            </button>
+
+        </section>
+
+
+        <!-- ВИДЕО -->
+
+        <main id="videoArea">
+
+            <div class="video-box">
+
+                <span class="video-label">
+                    Вы
+                </span>
+
+                <video
+                    id="localVideo"
+                    autoplay
+                    muted
+                    playsinline>
+                </video>
+
+                <div class="camera-off" id="localCameraOff">
+                    📹 Камера выключена
+                </div>
+
+            </div>
+
+
+            <div class="video-box">
+
+                <span class="video-label">
+                    Собеседник
+                </span>
+
+                <video
+                    id="remoteVideo"
+                    autoplay
+                    playsinline>
+                </video>
+
+                <div class="waiting" id="waitingText">
+                    Нажмите «Найти собеседника»
+                </div>
+
+            </div>
+
+        </main>
+
+
+        <!-- КНОПКИ -->
+
+        <div id="controls">
+
+            <button id="cameraButton">
+                📹 Камера
+            </button>
+
+            <button id="switchCameraButton">
+                🔄 Сменить камеру
+            </button>
+
+            <button id="micButton">
+                🎤 Микрофон
+            </button>
+
+            <button id="nextButton" class="primary">
+                ⏭ Следующий
+            </button>
+
+            <button id="reportButton" class="danger">
+                🚨 Жалоба
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+
+</body>
+
+</html>
