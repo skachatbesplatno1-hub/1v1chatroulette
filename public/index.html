@@ -2,17 +2,26 @@
 <html lang="ru">
 
 <head>
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>1v1ChatRoulette</title>
 
-    <link rel="stylesheet" href="style.css">
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
+
 </head>
+
 
 <body>
 
-    <!-- ОКНО 18+ -->
 
     <div id="ageModal" class="modal">
 
@@ -22,45 +31,75 @@
                 1v1<span>ChatRoulette</span>
             </div>
 
+
             <h1>Добро пожаловать</h1>
+
 
             <p class="subtitle">
                 Случайные видеочаты один на один
             </p>
 
+
             <div class="warning">
-                <strong>⚠️ Только для пользователей 18+</strong>
+
+                <strong>
+                    ⚠️ Используйте чат безопасно
+                </strong>
+
 
                 <p>
-                    Сервис предназначен только для совершеннолетних.
-                    Перед использованием необходимо подтвердить свой возраст
-                    и принять условия использования.
+                    Не сообщайте незнакомым людям личные данные.
+                    При нарушении правил используйте кнопку жалобы.
                 </p>
+
             </div>
+
 
             <div class="rules">
 
                 <h3>Правила</h3>
 
-                <p>• Уважайте других пользователей.</p>
-                <p>• Не публикуйте запрещённый контент.</p>
-                <p>• Не сообщайте незнакомцам личные данные.</p>
-                <p>• При нарушении правил используйте кнопку жалобы.</p>
+                <p>
+                    • Уважайте других пользователей.
+                </p>
+
+                <p>
+                    • Не публикуйте запрещённый контент.
+                </p>
+
+                <p>
+                    • Не сообщайте личные данные.
+                </p>
+
+                <p>
+                    • При нарушении правил используйте жалобу.
+                </p>
 
             </div>
 
+
             <label class="checkbox">
 
-                <input type="checkbox" id="termsCheck">
+                <input
+                    type="checkbox"
+                    id="termsCheck"
+                >
+
 
                 <span>
-                    Я подтверждаю, что мне <strong>18 лет или больше</strong>,
-                    принимаю условия использования и правила сервиса.
+                    Я принимаю правила использования сервиса.
                 </span>
 
             </label>
 
-            <button id="enterButton" disabled>
+
+            <br>
+
+
+            <button
+                id="enterButton"
+                disabled
+            >
                 Войти в 1v1ChatRoulette
             </button>
 
@@ -69,9 +108,9 @@
     </div>
 
 
-    <!-- ОСНОВНОЙ САЙТ -->
 
     <div id="app" class="hidden">
+
 
         <header>
 
@@ -79,22 +118,24 @@
                 1v1<span>ChatRoulette</span>
             </div>
 
+
             <div id="status">
-                Готов к поиску
+                Подключение...
             </div>
 
         </header>
 
 
-        <!-- НАСТРОЙКИ -->
 
         <section id="settings">
+
 
             <div class="setting">
 
                 <label for="myGender">
                     Ваш пол
                 </label>
+
 
                 <select id="myGender">
 
@@ -111,11 +152,13 @@
             </div>
 
 
+
             <div class="setting">
 
                 <label for="searchGender">
                     Искать
                 </label>
+
 
                 <select id="searchGender">
 
@@ -136,16 +179,20 @@
             </div>
 
 
-            <button id="startButton" class="primary">
+
+            <button
+                id="startButton"
+                class="primary"
+            >
                 🔍 Найти собеседника
             </button>
 
         </section>
 
 
-        <!-- ВИДЕО -->
 
         <main id="videoArea">
+
 
             <div class="video-box">
 
@@ -153,18 +200,24 @@
                     Вы
                 </span>
 
+
                 <video
                     id="localVideo"
                     autoplay
                     muted
-                    playsinline>
-                </video>
+                    playsinline
+                ></video>
 
-                <div class="camera-off" id="localCameraOff">
+
+                <div
+                    class="camera-off"
+                    id="localCameraOff"
+                >
                     📹 Камера выключена
                 </div>
 
             </div>
+
 
 
             <div class="video-box">
@@ -173,52 +226,74 @@
                     Собеседник
                 </span>
 
+
                 <video
                     id="remoteVideo"
                     autoplay
-                    playsinline>
-                </video>
+                    playsinline
+                ></video>
 
-                <div class="waiting" id="waitingText">
+
+                <div
+                    class="waiting"
+                    id="waitingText"
+                >
                     Нажмите «Найти собеседника»
                 </div>
 
             </div>
 
+
         </main>
 
 
-        <!-- КНОПКИ -->
 
         <div id="controls">
+
 
             <button id="cameraButton">
                 📹 Камера
             </button>
 
+
             <button id="switchCameraButton">
                 🔄 Сменить камеру
             </button>
+
 
             <button id="micButton">
                 🎤 Микрофон
             </button>
 
-            <button id="nextButton" class="primary">
+
+            <button
+                id="nextButton"
+                class="primary"
+            >
                 ⏭ Следующий
             </button>
 
-            <button id="reportButton" class="danger">
+
+            <button
+                id="reportButton"
+                class="danger"
+            >
                 🚨 Жалоба
             </button>
 
+
         </div>
+
 
     </div>
 
 
-   <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
-<script src="app.js"></script>
+
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+
+    <script src="app.js"></script>
+
+
 </body>
 
 </html>
