@@ -1,38 +1,82 @@
-const socket = io("https://onev1chatroulette.onrender.com"); const socket = io("https://onev1chatroulette.onrender.com", {
-    transports: ["polling"],
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000
-});
+/* =========================
+   SOCKET.IO
+========================= */
+
+const socket = io(
+    "https://onev1chatroulette.onrender.com",
+    {
+
+        transports: [
+            "websocket",
+            "polling"
+        ],
+
+        reconnection: true,
+
+        reconnectionAttempts: Infinity,
+
+        reconnectionDelay: 1000,
+
+        timeout: 20000
+
+    }
+);
+
 
 /* =========================
    ЭЛЕМЕНТЫ
 ========================= */
 
-const ageModal = document.getElementById("ageModal");
-const termsCheck = document.getElementById("termsCheck");
-const enterButton = document.getElementById("enterButton");
-const app = document.getElementById("app");
+const ageModal =
+    document.getElementById("ageModal");
 
-const statusText = document.getElementById("status");
+const termsCheck =
+    document.getElementById("termsCheck");
 
-const myGender = document.getElementById("myGender");
-const searchGender = document.getElementById("searchGender");
+const enterButton =
+    document.getElementById("enterButton");
 
-const startButton = document.getElementById("startButton");
+const app =
+    document.getElementById("app");
 
-const localVideo = document.getElementById("localVideo");
-const remoteVideo = document.getElementById("remoteVideo");
+const statusText =
+    document.getElementById("status");
 
-const localCameraOff = document.getElementById("localCameraOff");
-const waitingText = document.getElementById("waitingText");
+const myGender =
+    document.getElementById("myGender");
 
-const cameraButton = document.getElementById("cameraButton");
-const switchCameraButton = document.getElementById("switchCameraButton");
-const micButton = document.getElementById("micButton");
+const searchGender =
+    document.getElementById("searchGender");
 
-const nextButton = document.getElementById("nextButton");
-const reportButton = document.getElementById("reportButton");
+const startButton =
+    document.getElementById("startButton");
+
+const localVideo =
+    document.getElementById("localVideo");
+
+const remoteVideo =
+    document.getElementById("remoteVideo");
+
+const localCameraOff =
+    document.getElementById("localCameraOff");
+
+const waitingText =
+    document.getElementById("waitingText");
+
+const cameraButton =
+    document.getElementById("cameraButton");
+
+const switchCameraButton =
+    document.getElementById("switchCameraButton");
+
+const micButton =
+    document.getElementById("micButton");
+
+const nextButton =
+    document.getElementById("nextButton");
+
+const reportButton =
+    document.getElementById("reportButton");
 
 
 /* =========================
@@ -40,78 +84,172 @@ const reportButton = document.getElementById("reportButton");
 ========================= */
 
 let localStream = null;
-let peerConnection = null;
 
-let currentPartner = null;
+let peerConnection = null;
 
 let searching = false;
 
+let currentPartner = null;
+
 let cameraEnabled = true;
+
 let micEnabled = true;
 
-let currentCameraIndex = 0;
 let cameras = [];
 
-/* ICE-кандидаты, которые пришли
-   до установки remoteDescription */
+let currentCameraIndex = 0;
+
 let pendingCandidates = [];
 
 
 /* =========================
-   18+
+   SOCKET СОСТОЯНИЕ
 ========================= */
 
-termsCheck.addEventListener("change", () => {
+socket.on("connect", () => {
 
-    enterButton.disabled = !termsCheck.checked;
+    console.log(
+        "Socket.IO подключён:",
+        socket.id
+    );
+
+
+    if (
+        !searching &&
+        !currentPartner
+    ) {
+
+        statusText.textContent =
+            "Готов к поиску";
+
+    }
 
 });
 
 
-enterButton.addEventListener("click", () => {
+socket.on("disconnect", reason => {
 
-    if (!termsCheck.checked) return;
+    console.log(
+        "Socket.IO отключён:",
+        reason
+    );
 
-    ageModal.classList.add("hidden");
-    app.classList.remove("hidden");
 
-    statusText.textContent = "Готов к поиску";
+    statusText.textContent =
+        "Переподключение к серверу...";
+
+});
+
+
+socket.on("connect_error", error => {
+
+    console.error(
+        "Ошибка Socket.IO:",
+        error
+    );
+
+
+    statusText.textContent =
+        "Ошибка подключения к серверу";
 
 });
 
 
 /* =========================
-   КАМЕРА И МИКРОФОН
+   ВХОД
+========================= */
+
+termsCheck.addEventListener(
+    "change",
+    () => {
+
+        enterButton.disabled =
+            !termsCheck.checked;
+
+    }
+);
+
+
+enterButton.addEventListener(
+    "click",
+    () => {
+
+        if (!termsCheck.checked) {
+
+            return;
+
+        }
+
+
+        ageModal.classList.add(
+            "hidden"
+        );
+
+        app.classList.remove(
+            "hidden"
+        );
+
+
+        statusText.textContent =
+            socket.connected
+                ? "Готов к поиску"
+                : "Подключение к серверу...";
+
+    }
+);
+
+
+/* =========================
+   КАМЕРА
 ========================= */
 
 async function startCamera() {
 
     try {
 
-        localStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: true
-        });
+        localStream =
+            await navigator.mediaDevices.getUserMedia(
+                {
 
-        localVideo.srcObject = localStream;
+                    video: true,
+
+                    audio: true
+
+                }
+            );
+
+
+        localVideo.srcObject =
+            localStream;
+
 
         cameraEnabled = true;
+
         micEnabled = true;
 
+
         updateCameraButton();
+
         updateMicButton();
+
 
         await updateCameraList();
 
-        console.log("Камера и микрофон запущены");
+
+        console.log(
+            "Камера и микрофон запущены"
+        );
 
     } catch (error) {
 
-        console.error("Ошибка камеры/микрофона:", error);
+        console.error(
+            "Ошибка камеры:",
+            error
+        );
+
 
         alert(
-            "Не удалось получить доступ к камере или микрофону.\n\n" +
-            "Разреши браузеру использовать камеру и микрофон."
+            "Не удалось получить доступ к камере или микрофону."
         );
 
     }
@@ -128,18 +266,27 @@ async function updateCameraList() {
     try {
 
         const devices =
-            await navigator.mediaDevices.enumerateDevices();
+            await navigator.mediaDevices
+                .enumerateDevices();
 
-        cameras = devices.filter(
-            device => device.kind === "videoinput"
+
+        cameras =
+            devices.filter(
+                device =>
+                    device.kind ===
+                    "videoinput"
+            );
+
+
+        console.log(
+            "Камеры:",
+            cameras
         );
-
-        console.log("Камеры:", cameras);
 
     } catch (error) {
 
         console.error(
-            "Не удалось получить список камер:",
+            "Ошибка списка камер:",
             error
         );
 
@@ -156,51 +303,78 @@ async function switchCamera() {
 
     if (!localStream) {
 
-        alert("Сначала включи камеру.");
+        alert(
+            "Сначала включи камеру."
+        );
 
         return;
 
     }
+
 
     await updateCameraList();
 
+
     if (cameras.length < 2) {
 
-        alert("На этом устройстве доступна только одна камера.");
+        alert(
+            "На устройстве доступна только одна камера."
+        );
 
         return;
 
     }
 
+
     currentCameraIndex++;
 
-    if (currentCameraIndex >= cameras.length) {
+
+    if (
+        currentCameraIndex >=
+        cameras.length
+    ) {
+
         currentCameraIndex = 0;
+
     }
 
-    const camera = cameras[currentCameraIndex];
+
+    const camera =
+        cameras[currentCameraIndex];
+
 
     try {
 
         const newStream =
-            await navigator.mediaDevices.getUserMedia({
+            await navigator.mediaDevices
+                .getUserMedia(
+                    {
 
-                video: {
-                    deviceId: {
-                        exact: camera.deviceId
+                        video: {
+
+                            deviceId: {
+
+                                exact:
+                                    camera.deviceId
+
+                            }
+
+                        },
+
+                        audio: false
+
                     }
-                },
-
-                audio: false
-
-            });
+                );
 
 
         const newVideoTrack =
-            newStream.getVideoTracks()[0];
+            newStream
+                .getVideoTracks()[0];
+
 
         const oldVideoTrack =
-            localStream.getVideoTracks()[0];
+            localStream
+                .getVideoTracks()[0];
 
 
         if (peerConnection) {
@@ -209,10 +383,12 @@ async function switchCamera() {
                 peerConnection
                     .getSenders()
                     .find(
-                        s =>
-                            s.track &&
-                            s.track.kind === "video"
+                        sender =>
+                            sender.track &&
+                            sender.track.kind ===
+                                "video"
                     );
+
 
             if (sender) {
 
@@ -247,23 +423,15 @@ async function switchCamera() {
 
         cameraEnabled = true;
 
+
         updateCameraButton();
 
-
-        console.log(
-            "Камера переключена:",
-            camera.label
-        );
 
     } catch (error) {
 
         console.error(
             "Ошибка смены камеры:",
             error
-        );
-
-        alert(
-            "Не удалось переключить камеру."
         );
 
     }
@@ -279,14 +447,22 @@ function toggleCamera() {
 
     if (!localStream) return;
 
+
     const track =
-        localStream.getVideoTracks()[0];
+        localStream
+            .getVideoTracks()[0];
+
 
     if (!track) return;
 
-    cameraEnabled = !cameraEnabled;
 
-    track.enabled = cameraEnabled;
+    cameraEnabled =
+        !cameraEnabled;
+
+
+    track.enabled =
+        cameraEnabled;
+
 
     updateCameraButton();
 
@@ -300,18 +476,22 @@ function updateCameraButton() {
         cameraButton.textContent =
             "📹 Камера";
 
-        localCameraOff.classList.remove(
-            "active"
-        );
 
-    } else {
+        localCameraOff
+            .classList
+            .remove("active");
+
+    }
+
+    else {
 
         cameraButton.textContent =
             "📷 Камера выключена";
 
-        localCameraOff.classList.add(
-            "active"
-        );
+
+        localCameraOff
+            .classList
+            .add("active");
 
     }
 
@@ -326,14 +506,22 @@ function toggleMicrophone() {
 
     if (!localStream) return;
 
+
     const track =
-        localStream.getAudioTracks()[0];
+        localStream
+            .getAudioTracks()[0];
+
 
     if (!track) return;
 
-    micEnabled = !micEnabled;
 
-    track.enabled = micEnabled;
+    micEnabled =
+        !micEnabled;
+
+
+    track.enabled =
+        micEnabled;
+
 
     updateMicButton();
 
@@ -347,7 +535,9 @@ function updateMicButton() {
         micButton.textContent =
             "🎤 Микрофон";
 
-    } else {
+    }
+
+    else {
 
         micButton.textContent =
             "🔇 Микрофон выключен";
@@ -363,79 +553,71 @@ function updateMicButton() {
 
 function createPeerConnection() {
 
-    if (peerConnection) {
-
-        return peerConnection;
-
-    }
+    closePeerConnection();
 
 
-    console.log("Создаём WebRTC соединение");
+    pendingCandidates = [];
+
+
+    console.log(
+        "Создаём WebRTC соединение"
+    );
 
 
     peerConnection =
-        new RTCPeerConnection({
+        new RTCPeerConnection(
+            {
 
-            iceServers: [
+                iceServers: [
 
-                {
-                    urls:
-                        "stun:stun.l.google.com:19302"
-                }
+                    {
 
-            ]
+                        urls:
+                            "stun:stun.l.google.com:19302"
 
-        });
+                    }
 
+                ]
 
-    /* Отправляем свои треки */
+            }
+        );
+
 
     if (localStream) {
 
         localStream
             .getTracks()
-            .forEach(track => {
+            .forEach(
+                track => {
 
-                peerConnection.addTrack(
-                    track,
-                    localStream
-                );
+                    peerConnection.addTrack(
+                        track,
+                        localStream
+                    );
 
-            });
+                }
+            );
 
     }
 
 
-    /* Получаем видео и звук собеседника */
+    peerConnection.ontrack =
+        event => {
 
-    peerConnection.ontrack = event => {
+            console.log(
+                "Получен поток собеседника"
+            );
 
-        console.log(
-            "Получен remote track:",
-            event.track.kind
-        );
-
-
-        const stream =
-            event.streams[0];
-
-        if (stream) {
 
             remoteVideo.srcObject =
-                stream;
+                event.streams[0];
+
 
             waitingText.style.display =
                 "none";
 
-            statusText.textContent =
-                "Соединение установлено";
+        };
 
-        }
-
-    };
-
-
-    /* ICE */
 
     peerConnection.onicecandidate =
         event => {
@@ -451,24 +633,21 @@ function createPeerConnection() {
             }
 
 
-            console.log(
-                "Отправляем ICE-кандидат"
+            socket.emit(
+                "signal",
+                {
+
+                    type:
+                        "candidate",
+
+                    candidate:
+                        event.candidate
+
+                }
             );
-
-
-            socket.emit("signal", {
-
-                type: "candidate",
-
-                candidate:
-                    event.candidate
-
-            });
 
         };
 
-
-    /* Состояние соединения */
 
     peerConnection.onconnectionstatechange =
         () => {
@@ -477,7 +656,7 @@ function createPeerConnection() {
 
 
             console.log(
-                "WebRTC connectionState:",
+                "WebRTC состояние:",
                 peerConnection.connectionState
             );
 
@@ -488,7 +667,7 @@ function createPeerConnection() {
             ) {
 
                 statusText.textContent =
-                    "Соединение установлено";
+                    "Вы общаетесь";
 
             }
 
@@ -499,90 +678,11 @@ function createPeerConnection() {
             ) {
 
                 statusText.textContent =
-                    "Не удалось установить соединение";
-
-                console.error(
-                    "WebRTC connection FAILED"
-                );
-
-            }
-
-
-            if (
-                peerConnection.connectionState ===
-                "disconnected"
-            ) {
-
-                console.warn(
-                    "WebRTC disconnected"
-                );
+                    "Не удалось установить видеосвязь";
 
             }
 
         };
-
-
-    /* ICE-состояние */
-
-    peerConnection.oniceconnectionstatechange =
-        () => {
-
-            if (!peerConnection) return;
-
-
-            console.log(
-                "WebRTC ICE state:",
-                peerConnection.iceConnectionState
-            );
-
-        };
-
-
-    return peerConnection;
-
-}
-
-
-/* =========================
-   ОТЛОЖЕННЫЕ ICE
-========================= */
-
-async function flushPendingCandidates() {
-
-    if (!peerConnection) return;
-
-    if (!peerConnection.remoteDescription) return;
-
-
-    console.log(
-        "Добавляем отложенные ICE:",
-        pendingCandidates.length
-    );
-
-
-    for (
-        const candidate of pendingCandidates
-    ) {
-
-        try {
-
-            await peerConnection.addIceCandidate(
-                candidate
-            );
-
-        } catch (error) {
-
-            console.error(
-                "Ошибка отложенного ICE:",
-                error
-            );
-
-        }
-
-    }
-
-
-    pendingCandidates = [];
 
 }
 
@@ -593,15 +693,7 @@ async function flushPendingCandidates() {
 
 async function createOffer() {
 
-    if (!peerConnection) {
-
-        console.error(
-            "Нельзя создать offer: peerConnection отсутствует"
-        );
-
-        return;
-
-    }
+    if (!peerConnection) return;
 
 
     try {
@@ -612,12 +704,14 @@ async function createOffer() {
 
 
         const offer =
-            await peerConnection.createOffer();
+            await peerConnection
+                .createOffer();
 
 
-        await peerConnection.setLocalDescription(
-            offer
-        );
+        await peerConnection
+            .setLocalDescription(
+                offer
+            );
 
 
         console.log(
@@ -625,18 +719,24 @@ async function createOffer() {
         );
 
 
-        socket.emit("signal", {
+        socket.emit(
+            "signal",
+            {
 
-            type: "offer",
+                type:
+                    "offer",
 
-            offer
+                offer:
+                    peerConnection
+                        .localDescription
 
-        });
+            }
+        );
 
     } catch (error) {
 
         console.error(
-            "Ошибка создания offer:",
+            "Ошибка OFFER:",
             error
         );
 
@@ -646,151 +746,177 @@ async function createOffer() {
 
 
 /* =========================
-   СИГНАЛИЗАЦИЯ
+   SIGNAL
 ========================= */
 
-socket.on("signal", async data => {
+socket.on(
+    "signal",
+    async data => {
 
-    console.log(
-        "Получен SIGNAL:",
-        data.type
-    );
-
-
-    if (!peerConnection) {
-
-        createPeerConnection();
-
-    }
+        console.log(
+            "Получен SIGNAL:",
+            data.type
+        );
 
 
-    try {
+        try {
 
-        /* =====================
-           OFFER
-        ===================== */
+            if (
+                !peerConnection
+            ) {
 
-        if (data.type === "offer") {
+                createPeerConnection();
 
-            console.log(
-                "Получен OFFER"
-            );
-
-
-            await peerConnection.setRemoteDescription(
-                data.offer
-            );
-
-
-            await flushPendingCandidates();
-
-
-            const answer =
-                await peerConnection.createAnswer();
-
-
-            await peerConnection.setLocalDescription(
-                answer
-            );
-
-
-            console.log(
-                "Отправляем ANSWER"
-            );
-
-
-            socket.emit("signal", {
-
-                type: "answer",
-
-                answer
-
-            });
-
-        }
-
-
-        /* =====================
-           ANSWER
-        ===================== */
-
-        else if (data.type === "answer") {
-
-            console.log(
-                "Получен ANSWER"
-            );
-
-
-            await peerConnection.setRemoteDescription(
-                data.answer
-            );
-
-
-            await flushPendingCandidates();
-
-        }
-
-
-        /* =====================
-           ICE
-        ===================== */
-
-        else if (data.type === "candidate") {
-
-            if (!data.candidate) return;
+            }
 
 
             if (
-                peerConnection.remoteDescription
+                data.type ===
+                "offer"
             ) {
 
-                console.log(
-                    "Добавляем ICE-кандидат сразу"
-                );
+                await peerConnection
+                    .setRemoteDescription(
+                        data.offer
+                    );
 
 
-                await peerConnection.addIceCandidate(
-                    data.candidate
-                );
+                for (
+                    const candidate
+                    of pendingCandidates
+                ) {
 
-            } else {
+                    await peerConnection
+                        .addIceCandidate(
+                            candidate
+                        );
 
-                console.log(
-                    "ICE пришёл слишком рано — сохраняем"
-                );
+                }
 
 
-                pendingCandidates.push(
-                    data.candidate
+                pendingCandidates = [];
+
+
+                const answer =
+                    await peerConnection
+                        .createAnswer();
+
+
+                await peerConnection
+                    .setLocalDescription(
+                        answer
+                    );
+
+
+                socket.emit(
+                    "signal",
+                    {
+
+                        type:
+                            "answer",
+
+                        answer:
+                            peerConnection
+                                .localDescription
+
+                    }
                 );
 
             }
 
+
+            else if (
+                data.type ===
+                "answer"
+            ) {
+
+                await peerConnection
+                    .setRemoteDescription(
+                        data.answer
+                    );
+
+
+                for (
+                    const candidate
+                    of pendingCandidates
+                ) {
+
+                    await peerConnection
+                        .addIceCandidate(
+                            candidate
+                        );
+
+                }
+
+
+                pendingCandidates = [];
+
+            }
+
+
+            else if (
+                data.type ===
+                "candidate"
+            ) {
+
+                if (
+                    peerConnection
+                        .remoteDescription
+                ) {
+
+                    await peerConnection
+                        .addIceCandidate(
+                            data.candidate
+                        );
+
+                }
+
+                else {
+
+                    pendingCandidates.push(
+                        data.candidate
+                    );
+
+                }
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка WebRTC SIGNAL:",
+                error
+            );
+
         }
 
-    } catch (error) {
-
-        console.error(
-            "Ошибка WebRTC сигнализации:",
-            error
-        );
-
     }
-
-});
+);
 
 
 /* =========================
-   НАЙТИ СОБЕСЕДНИКА
+   НАЧАТЬ ПОИСК
 ========================= */
 
 startButton.addEventListener(
     "click",
     async () => {
 
+        if (!socket.connected) {
+
+            alert(
+                "Нет подключения к серверу. Подожди несколько секунд."
+            );
+
+            return;
+
+        }
+
+
         if (!localStream) {
 
             await startCamera();
+
 
             if (!localStream) {
 
@@ -812,14 +938,16 @@ startButton.addEventListener(
 
         currentPartner = null;
 
-        pendingCandidates = [];
-
 
         closePeerConnection();
 
 
         remoteVideo.srcObject =
             null;
+
+
+        waitingText.textContent =
+            "Ищем собеседника...";
 
 
         waitingText.style.display =
@@ -839,95 +967,111 @@ startButton.addEventListener(
         );
 
 
-        socket.emit("join-search", {
+        socket.emit(
+            "join-search",
+            {
 
-            gender:
-                myGender.value,
+                gender:
+                    myGender.value,
 
-            searchGender:
-                searchGender.value
+                searchGender:
+                    searchGender.value
 
-        });
+            }
+        );
 
     }
 );
 
 
 /* =========================
-   MATCH
-========================= */
-
-socket.on("matched", async data => {
-
-    console.log(
-        "СОБЕСЕДНИК НАЙДЕН:",
-        data
-    );
-
-
-    searching = false;
-
-    currentPartner =
-        data.partnerId;
-
-
-    statusText.textContent =
-        "Собеседник найден";
-
-
-    waitingText.style.display =
-        "flex";
-
-
-    startButton.disabled =
-        true;
-
-
-    pendingCandidates = [];
-
-
-    closePeerConnection();
-
-    createPeerConnection();
-
-
-    if (data.initiator) {
-
-        console.log(
-            "Я INITIATOR — создаём OFFER"
-        );
-
-
-        await createOffer();
-
-    } else {
-
-        console.log(
-            "Я НЕ initiator — жду OFFER"
-        );
-
-    }
-
-});
-
-
-/* =========================
    ПОИСК
 ========================= */
 
-socket.on("searching", () => {
+socket.on(
+    "searching",
+    () => {
 
-    searching = true;
+        console.log(
+            "Сервер сказал: продолжаем поиск"
+        );
 
-    statusText.textContent =
-        "Ищем собеседника...";
+
+        searching = true;
 
 
-    console.log(
-        "Сервер сказал: продолжаем поиск"
-    );
+        statusText.textContent =
+            "Ищем собеседника...";
 
-});
+
+        waitingText.textContent =
+            "Ищем собеседника...";
+
+
+        waitingText.style.display =
+            "flex";
+
+
+        startButton.disabled =
+            true;
+
+    }
+);
+
+
+/* =========================
+   СОБЕСЕДНИК НАЙДЕН
+========================= */
+
+socket.on(
+    "matched",
+    async data => {
+
+        console.log(
+            "СОБЕСЕДНИК НАЙДЕН:",
+            data
+        );
+
+
+        searching = false;
+
+
+        currentPartner =
+            data.partnerId;
+
+
+        statusText.textContent =
+            "Собеседник найден";
+
+
+        waitingText.textContent =
+            "Подключение к собеседнику...";
+
+
+        waitingText.style.display =
+            "flex";
+
+
+        startButton.disabled =
+            true;
+
+
+        createPeerConnection();
+
+
+        if (data.initiator) {
+
+            console.log(
+                "Я INITIATOR — создаём OFFER"
+            );
+
+
+            await createOffer();
+
+        }
+
+    }
+);
 
 
 /* =========================
@@ -945,9 +1089,7 @@ socket.on(
 
         currentPartner = null;
 
-        searching = true;
-
-        pendingCandidates = [];
+        searching = false;
 
 
         closePeerConnection();
@@ -957,34 +1099,20 @@ socket.on(
             null;
 
 
+        waitingText.textContent =
+            "Собеседник отключился";
+
+
         waitingText.style.display =
             "flex";
 
 
         statusText.textContent =
-            "Собеседник отключился. Ищем нового...";
+            "Готов к поиску";
 
 
-        setTimeout(() => {
-
-            if (searching) {
-
-                socket.emit(
-                    "join-search",
-                    {
-
-                        gender:
-                            myGender.value,
-
-                        searchGender:
-                            searchGender.value
-
-                    }
-                );
-
-            }
-
-        }, 500);
+        startButton.disabled =
+            false;
 
     }
 );
@@ -998,10 +1126,10 @@ nextButton.addEventListener(
     "click",
     () => {
 
-        if (!localStream) {
+        if (!socket.connected) {
 
             alert(
-                "Сначала найди собеседника."
+                "Нет подключения к серверу."
             );
 
             return;
@@ -1009,18 +1137,32 @@ nextButton.addEventListener(
         }
 
 
-        searching = true;
+        if (!localStream) {
 
-        currentPartner = null;
+            alert(
+                "Сначала включи камеру."
+            );
 
-        pendingCandidates = [];
+            return;
+
+        }
 
 
         closePeerConnection();
 
 
+        currentPartner = null;
+
+
         remoteVideo.srcObject =
             null;
+
+
+        searching = true;
+
+
+        waitingText.textContent =
+            "Ищем нового собеседника...";
 
 
         waitingText.style.display =
@@ -1029,6 +1171,10 @@ nextButton.addEventListener(
 
         statusText.textContent =
             "Ищем нового собеседника...";
+
+
+        startButton.disabled =
+            true;
 
 
         socket.emit("next");
@@ -1058,7 +1204,7 @@ reportButton.addEventListener(
 
         const confirmed =
             confirm(
-                "Отправить жалобу на этого пользователя?"
+                "Отправить жалобу?"
             );
 
 
@@ -1106,6 +1252,9 @@ function closePeerConnection() {
 
     }
 
+
+    pendingCandidates = [];
+
 }
 
 
@@ -1118,49 +1267,17 @@ cameraButton.addEventListener(
     toggleCamera
 );
 
+
 switchCameraButton.addEventListener(
     "click",
     switchCamera
 );
 
+
 micButton.addEventListener(
     "click",
     toggleMicrophone
 );
-
-
-/* =========================
-   SOCKET.IO
-========================= */
-
-socket.on("connect", () => {
-
-    console.log(
-        "Socket.IO подключён:",
-        socket.id
-    );
-
-});
-
-
-socket.on("disconnect", reason => {
-
-    console.warn(
-        "Socket.IO отключён:",
-        reason
-    );
-
-});
-
-
-socket.on("connect_error", error => {
-
-    console.error(
-        "Socket.IO ошибка подключения:",
-        error
-    );
-
-});
 
 
 /* =========================
