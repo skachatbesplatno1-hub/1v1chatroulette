@@ -5,28 +5,20 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 
-/* =========================
-   SOCKET.IO
-========================= */
-
 const io = new Server(server, {
     cors: {
         origin: "*",
-        methods: ["GET", "POST"],
-        credentials: false
+        methods: ["GET", "POST"]
     },
 
-    transports: ["polling", "websocket"],
-
-    allowEIO3: true
+    transports: [
+        "websocket",
+        "polling"
+    ]
 });
 
 
-/* =========================
-   STATIC FILES
-========================= */
-
-app.use(express.static("public"));
+const PORT = process.env.PORT || 10000;
 
 
 /* =========================
@@ -37,313 +29,240 @@ const users = new Map();
 
 
 /* =========================
+   СТАТИЧЕСКИЕ ФАЙЛЫ
+========================= */
+
+app.use(express.static("public"));
+
+
+app.get("/", (req, res) => {
+
+    res.send("1v1ChatRoulette server работает");
+
+});
+
+
+/* =========================
    ПРОВЕРКА СОВМЕСТИМОСТИ
 ========================= */
 
-function compatible(a, b) {
+function isCompatible(userA, userB) {
 
-    const aWants =
-        a.searchGender === "any" ||
-        a.searchGender === b.gender;
+    const aWantsB =
+        userA.searchGender === "any" ||
+        userA.searchGender === userB.gender;
 
-    const bWants =
-        b.searchGender === "any" ||
-        b.searchGender === a.gender;
 
-    return aWants && bWants;
+    const bWantsA =
+        userB.searchGender === "any" ||
+        userB.searchGender === userA.gender;
+
+
+    return aWantsB && bWantsA;
+
 }
 
 
 /* =========================
-   ПОИСК СОБЕСЕДНИКА
+   УБРАТЬ ИЗ ПОИСКА
 ========================= */
 
-function findPartner(id) {
+function removeFromSearch(socketId) {
 
-    const user = users.get(id);
+    const user = users.get(socketId);
 
-    if (!user) {
-        console.log("ПОИСК: пользователь не найден:", id);
-        return;
-    }
+    if (!user) return;
 
-    if (user.partner) {
-        console.log(
-            "ПОИСК: пользователь уже имеет партнёра:",
-            id
-        );
-        return;
-    }
+    user.searching = false;
 
-
-    console.log(
-        "Ищем партнёра для:",
-        id,
-        user
-    );
-
-
-    for (const [otherId, other] of users) {
-
-        if (otherId === id) {
-            continue;
-        }
-
-        if (other.partner) {
-            continue;
-        }
-
-        if (!compatible(user, other)) {
-            continue;
-        }
-
-
-        /* =====================
-           ПАРА НАЙДЕНА
-        ===================== */
-
-        user.partner = otherId;
-        other.partner = id;
-
-
-        console.log(
-            "================================="
-        );
-
-        console.log(
-            "НАЙДЕН СОБЕСЕДНИК:",
-            id,
-            "<->",
-            otherId
-        );
-
-        console.log(
-            "================================="
-        );
-
-
-        io.to(id).emit(
-            "matched",
-            {
-                partnerId: otherId,
-                initiator: true
-            }
-        );
-
-
-        io.to(otherId).emit(
-            "matched",
-            {
-                partnerId: id,
-                initiator: false
-            }
-        );
-
-
-        return;
-    }
-
-
-    console.log(
-        "Подходящего собеседника пока нет:",
-        id
-    );
-
-
-    io.to(id).emit("searching");
 }
 
 
 /* =========================
-   РАЗРЫВ ПАРЫ
+   НАЙТИ СОБЕСЕДНИКА
 ========================= */
 
-function disconnectPartner(id) {
+function findPartner(socketId) {
 
-    const user = users.get(id);
+    const user = users.get(socketId);
 
-    if (!user) {
-        return;
-    }
-
-    if (!user.partner) {
-        return;
-    }
+    if (!user) return null;
 
 
-    const partnerId = user.partner;
+    for (const [otherId, otherUser] of users) {
 
-    const partner = users.get(partnerId);
+        if (otherId === socketId) continue;
 
+        if (!otherUser.searching) continue;
 
-    user.partner = null;
+        if (otherUser.partner) continue;
 
+        if (!isCompatible(user, otherUser)) continue;
 
-    if (partner) {
-
-        partner.partner = null;
-
-
-        console.log(
-            "Партнёр отключён:",
-            id,
-            "->",
-            partnerId
-        );
-
-
-        io.to(partnerId).emit(
-            "partner-disconnected"
-        );
+        return otherId;
 
     }
+
+
+    return null;
+
 }
 
 
 /* =========================
-   SOCKET.IO CONNECTION
+   SOCKET.IO
 ========================= */
 
 io.on("connection", socket => {
 
-    console.log("");
-    console.log(
-        "================================="
-    );
-
-    console.log(
-        "ПОЛЬЗОВАТЕЛЬ ПОДКЛЮЧИЛСЯ:",
-        socket.id
-    );
-
-    console.log(
-        "Transport:",
-        socket.conn.transport.name
-    );
-
-    console.log(
-        "IP:",
-        socket.handshake.address
-    );
-
-    console.log(
-        "Origin:",
-        socket.handshake.headers.origin
-    );
-
-    console.log(
-        "================================="
-    );
+    console.log("=================================");
+    console.log("ПОЛЬЗОВАТЕЛЬ ПОДКЛЮЧИЛСЯ:", socket.id);
+    console.log("Transport:", socket.conn.transport.name);
+    console.log("=================================");
 
 
+    users.set(socket.id, {
 
-    /* =====================
-       JOIN SEARCH
-    ===================== */
+        gender: null,
+
+        searchGender: "any",
+
+        searching: false,
+
+        partner: null
+
+    });
+
+
+    /* =========================
+       СМЕНА TRANSPORT
+    ========================= */
+
+    socket.conn.on("upgrade", () => {
+
+        console.log(
+            "TRANSPORT UPGRADE:",
+            socket.id,
+            "->",
+            socket.conn.transport.name
+        );
+
+    });
+
+
+    /* =========================
+       ПОИСК
+    ========================= */
 
     socket.on("join-search", data => {
 
-        console.log("");
-        console.log(
-            "ПОИСК ОТ:",
-            socket.id
-        );
+        const user = users.get(socket.id);
 
-        console.log(
-            "ДАННЫЕ:",
-            data
-        );
+        if (!user) return;
 
 
-        if (
-            !data ||
-            !["male", "female"].includes(data.gender) ||
-            !["male", "female", "any"].includes(
-                data.searchGender
-            )
-        ) {
+        console.log("=================================");
+        console.log("ПОИСК ОТ:", socket.id);
+        console.log("ДАННЫЕ:", data);
+
+
+        user.gender =
+            data.gender || "male";
+
+        user.searchGender =
+            data.searchGender || "any";
+
+        user.searching = true;
+
+        user.partner = null;
+
+
+        const partnerId =
+            findPartner(socket.id);
+
+
+        if (!partnerId) {
 
             console.log(
-                "ОШИБКА: неправильные данные поиска"
+                "Подходящего собеседника пока нет:",
+                socket.id
             );
 
+            socket.emit("searching");
+
             return;
+
         }
 
 
-        /* Если пользователь уже был в системе,
-           удаляем старые данные */
-
-        users.delete(socket.id);
+        const partner =
+            users.get(partnerId);
 
 
-        users.set(
+        if (!partner) {
+
+            socket.emit("searching");
+
+            return;
+
+        }
+
+
+        /* Создаём пару */
+
+        user.searching = false;
+
+        partner.searching = false;
+
+
+        user.partner =
+            partnerId;
+
+        partner.partner =
+            socket.id;
+
+
+        console.log("=================================");
+        console.log(
+            "НАЙДЕН СОБЕСЕДНИК:",
             socket.id,
+            "<->",
+            partnerId
+        );
+        console.log("=================================");
+
+
+        /*
+         * Один пользователь создаёт OFFER.
+         * Второй принимает.
+         */
+
+        socket.emit("matched", {
+
+            partnerId,
+
+            initiator: true
+
+        });
+
+
+        io.to(partnerId).emit(
+            "matched",
             {
-                gender: data.gender,
-                searchGender: data.searchGender,
-                partner: null
+
+                partnerId: socket.id,
+
+                initiator: false
+
             }
         );
-
-
-        console.log(
-            "ПОЛЬЗОВАТЕЛЬ ДОБАВЛЕН В ПОИСК:",
-            socket.id
-        );
-
-        console.log(
-            "СЕЙЧАС ПОЛЬЗОВАТЕЛЕЙ:",
-            users.size
-        );
-
-
-        findPartner(socket.id);
 
     });
 
 
-
-    /* =====================
-       NEXT
-    ===================== */
-
-    socket.on("next", () => {
-
-        console.log(
-            "NEXT:",
-            socket.id
-        );
-
-
-        disconnectPartner(socket.id);
-
-
-        setTimeout(() => {
-
-            if (!users.has(socket.id)) {
-                return;
-            }
-
-
-            const user =
-                users.get(socket.id);
-
-
-            user.partner = null;
-
-
-            findPartner(socket.id);
-
-        }, 300);
-
-    });
-
-
-
-    /* =====================
-       WEBRTC SIGNAL
-    ===================== */
+    /* =========================
+       СИГНАЛ WEBRTC
+    ========================= */
 
     socket.on("signal", data => {
 
@@ -351,26 +270,9 @@ io.on("connection", socket => {
             users.get(socket.id);
 
 
-        if (!user) {
+        if (!user) return;
 
-            console.log(
-                "SIGNAL: пользователь не найден:",
-                socket.id
-            );
-
-            return;
-        }
-
-
-        if (!user.partner) {
-
-            console.log(
-                "SIGNAL: нет партнёра:",
-                socket.id
-            );
-
-            return;
-        }
+        if (!user.partner) return;
 
 
         console.log(
@@ -378,7 +280,7 @@ io.on("connection", socket => {
             socket.id,
             "->",
             user.partner,
-            data?.type
+            data.type
         );
 
 
@@ -390,10 +292,126 @@ io.on("connection", socket => {
     });
 
 
+    /* =========================
+       СЛЕДУЮЩИЙ
+    ========================= */
 
-    /* =====================
+    socket.on("next", () => {
+
+        const user =
+            users.get(socket.id);
+
+        if (!user) return;
+
+
+        console.log(
+            "NEXT:",
+            socket.id
+        );
+
+
+        const oldPartnerId =
+            user.partner;
+
+
+        user.partner = null;
+
+        user.searching = true;
+
+
+        /*
+         * Старого собеседника
+         * возвращаем в поиск.
+         */
+
+        if (oldPartnerId) {
+
+            const oldPartner =
+                users.get(oldPartnerId);
+
+
+            if (oldPartner) {
+
+                oldPartner.partner =
+                    null;
+
+                oldPartner.searching =
+                    true;
+
+
+                io.to(oldPartnerId).emit(
+                    "partner-disconnected"
+                );
+
+            }
+
+        }
+
+
+        const partnerId =
+            findPartner(socket.id);
+
+
+        if (!partnerId) {
+
+            socket.emit("searching");
+
+            return;
+
+        }
+
+
+        const partner =
+            users.get(partnerId);
+
+
+        if (!partner) {
+
+            socket.emit("searching");
+
+            return;
+
+        }
+
+
+        user.searching = false;
+
+        partner.searching = false;
+
+
+        user.partner =
+            partnerId;
+
+        partner.partner =
+            socket.id;
+
+
+        socket.emit("matched", {
+
+            partnerId,
+
+            initiator: true
+
+        });
+
+
+        io.to(partnerId).emit(
+            "matched",
+            {
+
+                partnerId: socket.id,
+
+                initiator: false
+
+            }
+        );
+
+    });
+
+
+    /* =========================
        ЖАЛОБА
-    ===================== */
+    ========================= */
 
     socket.on("report-user", () => {
 
@@ -401,78 +419,79 @@ io.on("connection", socket => {
             users.get(socket.id);
 
 
-        if (!user || !user.partner) {
-
-            return;
-
-        }
-
-
-        const partnerId =
-            user.partner;
+        if (!user) return;
 
 
         console.log(
             "ЖАЛОБА:",
             socket.id,
             "на",
-            partnerId
+            user.partner
         );
 
 
-        io.to(socket.id).emit(
+        socket.emit(
             "report-confirmed",
             "Жалоба отправлена."
         );
 
-
-        disconnectPartner(socket.id);
-
-
-        setTimeout(() => {
-
-            if (users.has(socket.id)) {
-
-                findPartner(socket.id);
-
-            }
-
-        }, 500);
-
     });
 
 
-
-    /* =====================
-       SOCKET DISCONNECT
-    ===================== */
+    /* =========================
+       ОТКЛЮЧЕНИЕ
+    ========================= */
 
     socket.on("disconnect", reason => {
 
-        console.log("");
-        console.log(
-            "================================="
-        );
-
+        console.log("=================================");
         console.log(
             "ПОЛЬЗОВАТЕЛЬ ОТКЛЮЧИЛСЯ:",
             socket.id
         );
-
         console.log(
             "Причина:",
             reason
         );
-
-        console.log(
-            "================================="
-        );
+        console.log("=================================");
 
 
-        disconnectPartner(socket.id);
+        const user =
+            users.get(socket.id);
+
+
+        if (!user) return;
+
+
+        const partnerId =
+            user.partner;
 
 
         users.delete(socket.id);
+
+
+        if (partnerId) {
+
+            const partner =
+                users.get(partnerId);
+
+
+            if (partner) {
+
+                partner.partner =
+                    null;
+
+                partner.searching =
+                    false;
+
+
+                io.to(partnerId).emit(
+                    "partner-disconnected"
+                );
+
+            }
+
+        }
 
 
         console.log(
@@ -482,66 +501,18 @@ io.on("connection", socket => {
 
     });
 
-
-
-    /* =====================
-       ERROR
-    ===================== */
-
-    socket.on("error", error => {
-
-        console.error(
-            "SOCKET ERROR:",
-            socket.id,
-            error
-        );
-
-    });
-
 });
 
 
 /* =========================
-   HTTP
+   ЗАПУСК
 ========================= */
-
-app.get("/health", (req, res) => {
-
-    res.json({
-        status: "ok",
-        users: users.size,
-        time: new Date().toISOString()
-    });
-
-});
-
-
-/* =========================
-   PORT
-========================= */
-
-const PORT =
-    process.env.PORT || 3000;
-
 
 server.listen(PORT, "0.0.0.0", () => {
 
-    console.log("");
-    console.log(
-        "================================="
-    );
-
-    console.log(
-        "1v1ChatRoulette запущен"
-    );
-
-    console.log(
-        "PORT:",
-        PORT
-    );
-
-    console.log(
-        "================================="
-    );
+    console.log("=================================");
+    console.log("1v1ChatRoulette запущен");
+    console.log("PORT:", PORT);
+    console.log("=================================");
 
 });
