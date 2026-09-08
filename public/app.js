@@ -1,4 +1,9 @@
-const socket = io("https://onev1chatroulette.onrender.com");
+const socket = io("https://onev1chatroulette.onrender.com"); const socket = io("https://onev1chatroulette.onrender.com", {
+    transports: ["polling"],
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000
+});
 
 /* =========================
    ЭЛЕМЕНТЫ
