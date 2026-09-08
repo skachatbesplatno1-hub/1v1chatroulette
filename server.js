@@ -85,7 +85,7 @@ io.on("connection", socket => {
 
     console.log("Пользователь подключился:", socket.id);
 
-    socket.on("join-search", data => {
+    socket.on("join-search", data => { console.log("ПОИСК:", socket.id, data);
 
         if (
             !data ||
