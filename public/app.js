@@ -47,6 +47,10 @@ let micEnabled = true;
 let currentCameraIndex = 0;
 let cameras = [];
 
+/* ICE-кандидаты, которые пришли
+   до установки remoteDescription */
+let pendingCandidates = [];
+
 
 /* =========================
    18+
@@ -98,7 +102,7 @@ async function startCamera() {
 
     } catch (error) {
 
-        console.error(error);
+        console.error("Ошибка камеры/микрофона:", error);
 
         alert(
             "Не удалось получить доступ к камере или микрофону.\n\n" +
@@ -190,15 +194,9 @@ async function switchCamera() {
         const newVideoTrack =
             newStream.getVideoTracks()[0];
 
-
         const oldVideoTrack =
             localStream.getVideoTracks()[0];
 
-
-        /*
-         * Меняем видеотрек внутри
-         * существующего WebRTC соединения.
-         */
 
         if (peerConnection) {
 
@@ -223,13 +221,15 @@ async function switchCamera() {
 
 
         if (oldVideoTrack) {
+
             oldVideoTrack.stop();
+
+            localStream.removeTrack(
+                oldVideoTrack
+            );
+
         }
 
-
-        localStream.removeTrack(
-            oldVideoTrack
-        );
 
         localStream.addTrack(
             newVideoTrack
@@ -358,6 +358,16 @@ function updateMicButton() {
 
 function createPeerConnection() {
 
+    if (peerConnection) {
+
+        return peerConnection;
+
+    }
+
+
+    console.log("Создаём WebRTC соединение");
+
+
     peerConnection =
         new RTCPeerConnection({
 
@@ -391,9 +401,15 @@ function createPeerConnection() {
     }
 
 
-    /* Получаем видео собеседника */
+    /* Получаем видео и звук собеседника */
 
     peerConnection.ontrack = event => {
+
+        console.log(
+            "Получен remote track:",
+            event.track.kind
+        );
+
 
         const stream =
             event.streams[0];
@@ -406,6 +422,9 @@ function createPeerConnection() {
             waitingText.style.display =
                 "none";
 
+            statusText.textContent =
+                "Соединение установлено";
+
         }
 
     };
@@ -416,7 +435,21 @@ function createPeerConnection() {
     peerConnection.onicecandidate =
         event => {
 
-            if (!event.candidate) return;
+            if (!event.candidate) {
+
+                console.log(
+                    "ICE-сбор завершён"
+                );
+
+                return;
+
+            }
+
+
+            console.log(
+                "Отправляем ICE-кандидат"
+            );
+
 
             socket.emit("signal", {
 
@@ -430,35 +463,162 @@ function createPeerConnection() {
         };
 
 
+    /* Состояние соединения */
+
     peerConnection.onconnectionstatechange =
         () => {
 
+            if (!peerConnection) return;
+
+
             console.log(
-                "WebRTC:",
+                "WebRTC connectionState:",
                 peerConnection.connectionState
             );
 
+
+            if (
+                peerConnection.connectionState ===
+                "connected"
+            ) {
+
+                statusText.textContent =
+                    "Соединение установлено";
+
+            }
+
+
+            if (
+                peerConnection.connectionState ===
+                "failed"
+            ) {
+
+                statusText.textContent =
+                    "Не удалось установить соединение";
+
+                console.error(
+                    "WebRTC connection FAILED"
+                );
+
+            }
+
+
+            if (
+                peerConnection.connectionState ===
+                "disconnected"
+            ) {
+
+                console.warn(
+                    "WebRTC disconnected"
+                );
+
+            }
+
         };
+
+
+    /* ICE-состояние */
+
+    peerConnection.oniceconnectionstatechange =
+        () => {
+
+            if (!peerConnection) return;
+
+
+            console.log(
+                "WebRTC ICE state:",
+                peerConnection.iceConnectionState
+            );
+
+        };
+
+
+    return peerConnection;
 
 }
 
 
 /* =========================
-   ПЕРЕСОЕДИНЕНИЕ
+   ОТЛОЖЕННЫЕ ICE
+========================= */
+
+async function flushPendingCandidates() {
+
+    if (!peerConnection) return;
+
+    if (!peerConnection.remoteDescription) return;
+
+
+    console.log(
+        "Добавляем отложенные ICE:",
+        pendingCandidates.length
+    );
+
+
+    for (
+        const candidate of pendingCandidates
+    ) {
+
+        try {
+
+            await peerConnection.addIceCandidate(
+                candidate
+            );
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка отложенного ICE:",
+                error
+            );
+
+        }
+
+    }
+
+
+    pendingCandidates = [];
+
+}
+
+
+/* =========================
+   OFFER
 ========================= */
 
 async function createOffer() {
 
-    if (!peerConnection) return;
+    if (!peerConnection) {
+
+        console.error(
+            "Нельзя создать offer: peerConnection отсутствует"
+        );
+
+        return;
+
+    }
+
 
     try {
+
+        console.log(
+            "Создаём OFFER"
+        );
+
 
         const offer =
             await peerConnection.createOffer();
 
+
         await peerConnection.setLocalDescription(
             offer
         );
+
+
+        console.log(
+            "Отправляем OFFER"
+        );
+
 
         socket.emit("signal", {
 
@@ -486,6 +646,12 @@ async function createOffer() {
 
 socket.on("signal", async data => {
 
+    console.log(
+        "Получен SIGNAL:",
+        data.type
+    );
+
+
     if (!peerConnection) {
 
         createPeerConnection();
@@ -495,11 +661,23 @@ socket.on("signal", async data => {
 
     try {
 
+        /* =====================
+           OFFER
+        ===================== */
+
         if (data.type === "offer") {
+
+            console.log(
+                "Получен OFFER"
+            );
+
 
             await peerConnection.setRemoteDescription(
                 data.offer
             );
+
+
+            await flushPendingCandidates();
 
 
             const answer =
@@ -508,6 +686,11 @@ socket.on("signal", async data => {
 
             await peerConnection.setLocalDescription(
                 answer
+            );
+
+
+            console.log(
+                "Отправляем ANSWER"
             );
 
 
@@ -522,23 +705,57 @@ socket.on("signal", async data => {
         }
 
 
+        /* =====================
+           ANSWER
+        ===================== */
+
         else if (data.type === "answer") {
+
+            console.log(
+                "Получен ANSWER"
+            );
+
 
             await peerConnection.setRemoteDescription(
                 data.answer
             );
 
+
+            await flushPendingCandidates();
+
         }
 
 
+        /* =====================
+           ICE
+        ===================== */
+
         else if (data.type === "candidate") {
 
+            if (!data.candidate) return;
+
+
             if (
-                data.candidate &&
                 peerConnection.remoteDescription
             ) {
 
+                console.log(
+                    "Добавляем ICE-кандидат сразу"
+                );
+
+
                 await peerConnection.addIceCandidate(
+                    data.candidate
+                );
+
+            } else {
+
+                console.log(
+                    "ICE пришёл слишком рано — сохраняем"
+                );
+
+
+                pendingCandidates.push(
                     data.candidate
                 );
 
@@ -549,7 +766,7 @@ socket.on("signal", async data => {
     } catch (error) {
 
         console.error(
-            "Ошибка WebRTC:",
+            "Ошибка WebRTC сигнализации:",
             error
         );
 
@@ -571,24 +788,34 @@ startButton.addEventListener(
             await startCamera();
 
             if (!localStream) {
+
                 return;
+
             }
 
         }
 
 
-        if (searching) return;
+        if (searching) {
+
+            return;
+
+        }
 
 
         searching = true;
 
         currentPartner = null;
 
+        pendingCandidates = [];
+
 
         closePeerConnection();
 
 
-        remoteVideo.srcObject = null;
+        remoteVideo.srcObject =
+            null;
+
 
         waitingText.style.display =
             "flex";
@@ -600,6 +827,11 @@ startButton.addEventListener(
 
         startButton.disabled =
             true;
+
+
+        console.log(
+            "Отправляем join-search"
+        );
 
 
         socket.emit("join-search", {
@@ -622,6 +854,12 @@ startButton.addEventListener(
 
 socket.on("matched", async data => {
 
+    console.log(
+        "СОБЕСЕДНИК НАЙДЕН:",
+        data
+    );
+
+
     searching = false;
 
     currentPartner =
@@ -633,19 +871,35 @@ socket.on("matched", async data => {
 
 
     waitingText.style.display =
-        "none";
+        "flex";
 
 
     startButton.disabled =
         true;
 
 
+    pendingCandidates = [];
+
+
+    closePeerConnection();
+
     createPeerConnection();
 
 
     if (data.initiator) {
 
+        console.log(
+            "Я INITIATOR — создаём OFFER"
+        );
+
+
         await createOffer();
+
+    } else {
+
+        console.log(
+            "Я НЕ initiator — жду OFFER"
+        );
 
     }
 
@@ -663,6 +917,11 @@ socket.on("searching", () => {
     statusText.textContent =
         "Ищем собеседника...";
 
+
+    console.log(
+        "Сервер сказал: продолжаем поиск"
+    );
+
 });
 
 
@@ -674,9 +933,16 @@ socket.on(
     "partner-disconnected",
     () => {
 
+        console.log(
+            "Собеседник отключился"
+        );
+
+
         currentPartner = null;
 
         searching = true;
+
+        pendingCandidates = [];
 
 
         closePeerConnection();
@@ -741,6 +1007,8 @@ nextButton.addEventListener(
         searching = true;
 
         currentPartner = null;
+
+        pendingCandidates = [];
 
 
         closePeerConnection();
@@ -822,6 +1090,11 @@ function closePeerConnection() {
 
     if (peerConnection) {
 
+        console.log(
+            "Закрываем старое WebRTC соединение"
+        );
+
+
         peerConnection.close();
 
         peerConnection = null;
@@ -849,6 +1122,40 @@ micButton.addEventListener(
     "click",
     toggleMicrophone
 );
+
+
+/* =========================
+   SOCKET.IO
+========================= */
+
+socket.on("connect", () => {
+
+    console.log(
+        "Socket.IO подключён:",
+        socket.id
+    );
+
+});
+
+
+socket.on("disconnect", reason => {
+
+    console.warn(
+        "Socket.IO отключён:",
+        reason
+    );
+
+});
+
+
+socket.on("connect_error", error => {
+
+    console.error(
+        "Socket.IO ошибка подключения:",
+        error
+    );
+
+});
 
 
 /* =========================
