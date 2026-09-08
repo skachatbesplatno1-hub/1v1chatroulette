@@ -42,7 +42,7 @@ function findPartner(id) {
         if (!compatible(user, other)) continue;
 
         user.partner = otherId;
-        other.partner = id;
+        other.partner = id; console.log("НАЙДЕН СОБЕСЕДНИК:", id, "<->", otherId);
 
         io.to(id).emit("matched", {
             partnerId: otherId,
